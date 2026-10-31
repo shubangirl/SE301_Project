@@ -2,3 +2,4 @@ target/
 archive/
 .DS_Store
 __MACOSX/
+docs/
