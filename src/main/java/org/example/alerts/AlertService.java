@@ -3,7 +3,7 @@ package org.example.alerts;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class AlertService {
+public class AlertService implements AlertPublisher {
     private final AlertRepository repository;
     private final AtomicInteger totalAlertsGenerated = new AtomicInteger();
 
@@ -11,6 +11,7 @@ public class AlertService {
         this.repository = repository;
     }
 
+    @Override
     public Alert createAlert(
             String chamber,
             String crop,
