@@ -9,11 +9,15 @@ import java.util.Optional;
 public record Rule(SensorType sensor, double low, double high, Action onLow, Action onHigh) {
 
     /** Reaction to a breach: optional device to trigger plus resource cost. */
-    public record Action(ControlType control, int water, int energy) {
-        public static final Action NONE = new Action(null, 0, 0);
+    public record Action(ControlType control, int water, int energy, int nutrient) {
+        public static final Action NONE = new Action(null, 0, 0, 0);
 
         public static Action of(ControlType control, int water, int energy) {
-            return new Action(control, water, energy);
+            return new Action(control, water, energy, 0);
+        }
+
+        public static Action of(ControlType control, int water, int energy, int nutrient) {
+            return new Action(control, water, energy, nutrient);
         }
     }
 
@@ -35,7 +39,8 @@ public record Rule(SensorType sensor, double low, double high, Action onLow, Act
 
     /** Temperature band where overheating triggers the cooling fan. */
     public static Rule temperature(double low, double high) {
-        return new Rule(SensorType.TEMPERATURE, low, high, Action.NONE,
+        return new Rule(SensorType.TEMPERATURE, low, high,
+                Action.of(ControlType.HEATING_UNIT, 0, 15),
                 Action.of(ControlType.COOLING_FAN, 0, 0));
     }
 }

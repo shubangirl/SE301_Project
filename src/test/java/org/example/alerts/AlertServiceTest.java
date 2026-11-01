@@ -35,4 +35,19 @@ class AlertServiceTest {
         assertEquals(0, service.getActiveAlertCount());
         assertEquals(1, service.getArchivedAlerts().size());
     }
+
+    @Test
+    void createsCriticalSensorFailureAlert() {
+        AlertService service = new AlertService(new AlertRepository());
+
+        Alert alert = service.createSensorFailureAlert(
+                "CH1",
+                "Tomato",
+                "TEMPERATURE",
+                "invalid reading"
+        );
+
+        assertEquals(AlertSeverity.CRITICAL, alert.getSeverity());
+        assertEquals(1, service.getActiveAlertCount());
+    }
 }

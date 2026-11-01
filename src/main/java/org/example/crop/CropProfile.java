@@ -19,8 +19,18 @@ public record CropProfile(String name, List<Rule> rules) {
     /** Builds a profile from crop-specific rules plus the light and nutrient rules every crop shares. */
     public static CropProfile of(String name, Rule... specificRules) {
         List<Rule> all = new ArrayList<>(List.of(specificRules));
-        all.add(Rule.lowOnly(SensorType.LIGHT, MIN_LIGHT, Rule.Action.of(ControlType.GROW_LIGHT, 0, 0)));
-        all.add(Rule.lowOnly(SensorType.NUTRIENT, MIN_NUTRIENT, Rule.Action.of(ControlType.NUTRIENT_INJECTOR, 0, 0)));
+        all.add(new Rule(
+                SensorType.LIGHT,
+                MIN_LIGHT,
+                900,
+                Rule.Action.of(ControlType.GROW_LIGHT, 0, 0),
+                Rule.Action.of(ControlType.SHADE_CONTROLLER, 0, 0)
+        ));
+        all.add(Rule.lowOnly(
+                SensorType.NUTRIENT,
+                MIN_NUTRIENT,
+                Rule.Action.of(ControlType.NUTRIENT_INJECTOR, 0, 0, 15)
+        ));
         return new CropProfile(name, all);
     }
 
