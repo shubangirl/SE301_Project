@@ -43,6 +43,17 @@ public final class ChamberMonitor implements Runnable {
 
     /** Package-visible so tests can feed a reading directly. */
     void process(SensorType sensor, double value) throws InterruptedException {
+        if (!Double.isFinite(value)) {
+            alerts.createSensorFailureAlert(
+                    chamber.id(),
+                    chamber.crop().name(),
+                    sensor.name(),
+                    "invalid reading"
+            );
+            chamber.summary().recordAlert("Sensor failure: " + sensor.name());
+            return;
+        }
+
         chamber.state().set(sensor, value);
 
         for (Rule rule : chamber.crop().rulesFor(sensor)) {
@@ -55,9 +66,15 @@ public final class ChamberMonitor implements Runnable {
             String label = breach.get().high() ? sensor.highLabel() : sensor.lowLabel();
             String message = chamber.id() + " " + chamber.crop().name() + " " + label;
 
-            alerts.createAlert(chamber.id(), chamber.crop().name(), message, AlertSeverity.WARNING);
+            alerts.createAlert(
+                    chamber.id(),
+                    chamber.crop().name(),
+                    message,
+                    AlertSeverity.WARNING
+            );
             chamber.summary().recordAlert(message);
             usage.add(action.water(), action.energy());
+            usage.addNutrient(action.nutrient());
 
             if (action.control() != null) {
                 controls.submit(chamber, action.control());

@@ -27,6 +27,20 @@ public class AlertService implements AlertPublisher {
         return alert;
     }
 
+    public Alert createSensorFailureAlert(
+            String chamber,
+            String crop,
+            String sensor,
+            String reason
+    ) {
+        return createAlert(
+                chamber,
+                crop,
+                "Sensor failure: " + sensor + " (" + reason + ")",
+                AlertSeverity.CRITICAL
+        );
+    }
+
     public List<Alert> getActiveAlerts() {
         return repository.getActiveAlerts();
     }

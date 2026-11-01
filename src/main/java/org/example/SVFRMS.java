@@ -43,7 +43,10 @@ public class SVFRMS {
             pool.submit(new ChamberMonitor(chamber, alerts, usage, controls));
         }
         pool.shutdown();
-        pool.awaitTermination(5, TimeUnit.MINUTES);
+        if (!pool.awaitTermination(5, TimeUnit.MINUTES)) {
+            pool.shutdownNow();
+            throw new IllegalStateException("Chamber monitoring did not finish within five minutes");
+        }
 
         controls.shutdown();
         controlThread.join();
@@ -57,13 +60,20 @@ public class SVFRMS {
                 .map(c -> c.id() + " -> " + c.summary().describe())
                 .toList();
 
-        List<String> report = new ReportService().createDailyReport(
+        ReportService reportService = new ReportService();
+        List<String> additionalReports = new java.util.ArrayList<>();
+        additionalReports.addAll(reportService.createWeeklyCropReport(chamberLines));
+        additionalReports.addAll(reportService.createWaterUsageReport(usage.water()));
+        additionalReports.addAll(reportService.createEnergyConsumptionReport(usage.energy()));
+        additionalReports.addAll(reportService.createNutrientConsumptionReport(usage.nutrient()));
+
+        List<String> report = reportService.createDailyReport(
                 alerts.getTotalAlertsGenerated(),
                 alerts.getActiveAlertCount(),
                 alerts.getArchivedAlerts().size(),
                 usage.water(),
                 usage.energy(),
-                List.of(note),
+                combineEntries(note, additionalReports),
                 chamberLines,
                 alerts.getArchivedAlerts());
 
@@ -71,5 +81,12 @@ public class SVFRMS {
         System.out.println("System finished sensor processing.");
         new ReportWriter().write(REPORT_FILE, report);
         System.out.println("Archive report saved to: " + REPORT_FILE.toAbsolutePath());
+    }
+
+    private static List<String> combineEntries(String note, List<String> additionalReports) {
+        List<String> entries = new java.util.ArrayList<>();
+        entries.add(note);
+        entries.addAll(additionalReports);
+        return entries;
     }
 }

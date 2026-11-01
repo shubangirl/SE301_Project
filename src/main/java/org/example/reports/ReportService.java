@@ -7,6 +7,34 @@ import java.util.Date;
 import java.util.List;
 
 public class ReportService {
+    public List<String> createWeeklyCropReport(List<String> chamberSummaries) {
+        List<String> report = new ArrayList<>();
+        report.add("===== WEEKLY CROP REPORT =====");
+        report.addAll(chamberSummaries);
+        return report;
+    }
+
+    public List<String> createWaterUsageReport(int waterUsage) {
+        return List.of(
+                "===== WATER USAGE REPORT =====",
+                "Water Usage: " + waterUsage + " L"
+        );
+    }
+
+    public List<String> createEnergyConsumptionReport(int energyUsage) {
+        return List.of(
+                "===== ENERGY CONSUMPTION REPORT =====",
+                "Energy Usage: " + energyUsage + " kWh"
+        );
+    }
+
+    public List<String> createNutrientConsumptionReport(int nutrientUsage) {
+        return List.of(
+                "===== NUTRIENT CONSUMPTION REPORT =====",
+                "Nutrient Usage: " + nutrientUsage + " units"
+        );
+    }
+
     public List<String> createDailyReport(
             int generatedAlerts,
             int activeAlerts,

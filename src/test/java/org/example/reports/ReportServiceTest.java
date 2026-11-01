@@ -35,4 +35,14 @@ class ReportServiceTest {
         assertTrue(report.contains("Energy Usage: 20 kWh"));
         assertTrue(report.contains("[WARNING][CH1][Tomato] High temperature"));
     }
+
+    @Test
+    void createsRequiredOperationalReports() {
+        ReportService service = new ReportService();
+
+        assertTrue(service.createWeeklyCropReport(List.of("CH1 -> Tomato")).contains("===== WEEKLY CROP REPORT ====="));
+        assertTrue(service.createWaterUsageReport(50).contains("Water Usage: 50 L"));
+        assertTrue(service.createEnergyConsumptionReport(12).contains("Energy Usage: 12 kWh"));
+        assertTrue(service.createNutrientConsumptionReport(15).contains("Nutrient Usage: 15 units"));
+    }
 }
