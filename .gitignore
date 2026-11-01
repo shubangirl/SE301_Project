@@ -1,2 +1,7 @@
+target/
+archive/
+.DS_Store
+__MACOSX/
+docs/
 /target
 /target/*
