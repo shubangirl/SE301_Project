@@ -1,22 +1,34 @@
 package org.example.crop;
 
+import org.example.devices.ControlDevice;
 import org.example.devices.ControlType;
 import org.example.model.SensorType;
 
+import java.util.Objects;
 import java.util.Optional;
 
 /** One threshold rule: what to do when a sensor goes below {@code low} or above {@code high}. */
 public record Rule(SensorType sensor, double low, double high, Action onLow, Action onHigh) {
 
-    /** Reaction to a breach: optional device to trigger plus resource cost. */
-    public record Action(ControlType control, int water, int energy, int nutrient) {
+    public Rule {
+        Objects.requireNonNull(sensor, "sensor");
+        Objects.requireNonNull(onLow, "onLow (use Action.NONE for no reaction)");
+        Objects.requireNonNull(onHigh, "onHigh (use Action.NONE for no reaction)");
+        if (Double.isNaN(low) || Double.isNaN(high) || low > high) {
+            throw new IllegalArgumentException(
+                    "Invalid range for " + sensor + ": low=" + low + ", high=" + high);
+        }
+    }
+
+    /** Reaction to a breach: optional device to trigger plus resource cost. Any {@link ControlDevice} works. */
+    public record Action(ControlDevice control, int water, int energy, int nutrient) {
         public static final Action NONE = new Action(null, 0, 0, 0);
 
-        public static Action of(ControlType control, int water, int energy) {
+        public static Action of(ControlDevice control, int water, int energy) {
             return new Action(control, water, energy, 0);
         }
 
-        public static Action of(ControlType control, int water, int energy, int nutrient) {
+        public static Action of(ControlDevice control, int water, int energy, int nutrient) {
             return new Action(control, water, energy, nutrient);
         }
     }
@@ -37,10 +49,15 @@ public record Rule(SensorType sensor, double low, double high, Action onLow, Act
         return new Rule(sensor, low, Double.POSITIVE_INFINITY, onLow, Action.NONE);
     }
 
-    /** Temperature band where overheating triggers the cooling fan. */
+    /** Temperature band using the standard response: heater when too cold, cooling fan when too hot. */
     public static Rule temperature(double low, double high) {
-        return new Rule(SensorType.TEMPERATURE, low, high,
+        return temperature(low, high,
                 Action.of(ControlType.HEATING_UNIT, 0, 15),
                 Action.of(ControlType.COOLING_FAN, 0, 0));
+    }
+
+    /** Temperature band with a custom response, so a crop is never forced into the default one. */
+    public static Rule temperature(double low, double high, Action onLow, Action onHigh) {
+        return new Rule(SensorType.TEMPERATURE, low, high, onLow, onHigh);
     }
 }

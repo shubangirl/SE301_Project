@@ -7,7 +7,9 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.List;
 
-public class ReportWriter {
+/** Writes report lines to a UTF-8 text file, replacing any existing content. */
+public class ReportWriter implements ReportSink {
+    @Override
     public void write(Path reportFile, List<String> reportLines) throws IOException {
         Files.createDirectories(reportFile.getParent());
         Files.write(

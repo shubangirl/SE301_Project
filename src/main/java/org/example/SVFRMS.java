@@ -1,92 +1,72 @@
 package org.example;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
 import org.example.alerts.AlertRepository;
 import org.example.alerts.AlertService;
 import org.example.chamber.Chamber;
+import org.example.crop.CropCatalog;
 import org.example.crop.CropRegistry;
 import org.example.devices.ControlCenter;
 import org.example.monitoring.ChamberMonitor;
 import org.example.monitoring.ResourceUsage;
 import org.example.reports.ReportService;
+import org.example.reports.ReportSink;
 import org.example.reports.ReportWriter;
 
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Comparator;
-import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-
-/** Composition root: creates the components and wires them together. Holds no mutable static state. */
+/**
+ * Composition root: chooses the implementations and wires them together.
+ * Contains no business logic.
+ */
 public class SVFRMS {
     private static final Path REPORT_FILE = Paths.get("archive").resolve("daily_report.txt");
+    private static final Duration MONITORING_TIMEOUT = Duration.ofMinutes(5);
+
+    /** Which crop each chamber grows. Add a line here to add a chamber. */
+    private static final Map<String, String> CHAMBER_CROPS = new LinkedHashMap<>();
+    static {
+        CHAMBER_CROPS.put("CH1", "Tomato");
+        CHAMBER_CROPS.put("CH2", "Strawberry");
+        CHAMBER_CROPS.put("CH3", "Lettuce");
+        CHAMBER_CROPS.put("CH4", "Chili");
+        CHAMBER_CROPS.put("CH5", "Bell Pepper");
+    }
 
     public static void main(String[] args) throws Exception {
-        CropRegistry crops = CropRegistry.withDefaults();
-        List<Chamber> chambers = List.of(
-                new Chamber("CH1", crops.get("Tomato")),
-                new Chamber("CH2", crops.get("Strawberry")),
-                new Chamber("CH3", crops.get("Lettuce")),
-                new Chamber("CH4", crops.get("Chili")),
-                new Chamber("CH5", crops.get("Bell Pepper")));
+        CropCatalog crops = CropRegistry.withDefaults();
+        List<Chamber> chambers = createChambers(crops);
 
         AlertService alerts = new AlertService(new AlertRepository());
         ResourceUsage usage = new ResourceUsage();
         ControlCenter controls = new ControlCenter();
 
-        Thread controlThread = new Thread(controls, "control-center");
-        controlThread.start();
-
-        ExecutorService pool = Executors.newFixedThreadPool(chambers.size());
-        for (Chamber chamber : chambers) {
-            pool.submit(new ChamberMonitor(chamber, alerts, usage, controls));
-        }
-        pool.shutdown();
-        if (!pool.awaitTermination(5, TimeUnit.MINUTES)) {
-            pool.shutdownNow();
-            throw new IllegalStateException("Chamber monitoring did not finish within five minutes");
-        }
-
-        controls.shutdown();
-        controlThread.join();
-
-        // Archive first, then report: deterministic order removes the old archive/report race.
-        int moved = alerts.archiveAlerts().size();
-        String note = moved > 0 ? "Archived " + moved + " alerts" : "No alerts to archive";
-
-        List<String> chamberLines = chambers.stream()
-                .sorted(Comparator.comparing(Chamber::id))
-                .map(c -> c.id() + " -> " + c.summary().describe())
+        List<ChamberMonitor> monitors = chambers.stream()
+                .map(chamber -> new ChamberMonitor(chamber, alerts, usage, controls))
                 .toList();
+        new SimulationRunner(controls, MONITORING_TIMEOUT).run(monitors);
 
-        ReportService reportService = new ReportService();
-        List<String> additionalReports = new java.util.ArrayList<>();
-        additionalReports.addAll(reportService.createWeeklyCropReport(chamberLines));
-        additionalReports.addAll(reportService.createWaterUsageReport(usage.water()));
-        additionalReports.addAll(reportService.createEnergyConsumptionReport(usage.energy()));
-        additionalReports.addAll(reportService.createNutrientConsumptionReport(usage.nutrient()));
-
-        List<String> report = reportService.createDailyReport(
-                alerts.getTotalAlertsGenerated(),
-                alerts.getActiveAlertCount(),
-                alerts.getArchivedAlerts().size(),
-                usage.water(),
-                usage.energy(),
-                combineEntries(note, additionalReports),
-                chamberLines,
-                alerts.getArchivedAlerts());
+        // Archive first, then report: deterministic order removes the old
+        // archive/report race.
+        int archivedThisRun = alerts.archiveAlerts().size();
+        List<String> report = new ReportAssembler(new ReportService(), alerts, usage)
+                .dailyReport(chambers, archivedThisRun);
 
         report.forEach(System.out::println);
         System.out.println("System finished sensor processing.");
-        new ReportWriter().write(REPORT_FILE, report);
+
+        ReportSink sink = new ReportWriter();
+        sink.write(REPORT_FILE, report);
         System.out.println("Archive report saved to: " + REPORT_FILE.toAbsolutePath());
     }
 
-    private static List<String> combineEntries(String note, List<String> additionalReports) {
-        List<String> entries = new java.util.ArrayList<>();
-        entries.add(note);
-        entries.addAll(additionalReports);
-        return entries;
+    private static List<Chamber> createChambers(CropCatalog crops) {
+        return CHAMBER_CROPS.entrySet().stream()
+                .map(entry -> new Chamber(entry.getKey(), crops.get(entry.getValue())))
+                .toList();
     }
 }

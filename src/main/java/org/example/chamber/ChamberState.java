@@ -1,6 +1,6 @@
 package org.example.chamber;
 
-import org.example.devices.ControlType;
+import org.example.devices.ControlDevice;
 import org.example.model.SensorType;
 
 import java.util.EnumMap;
@@ -24,9 +24,9 @@ public final class ChamberState {
     }
 
     /** Runs a device against this state atomically and returns the resulting value. */
-    public synchronized double apply(ControlType control) {
-        double updated = control.next(values.get(control.target()));
-        values.put(control.target(), updated);
+    public synchronized double apply(ControlDevice device) {
+        double updated = device.next(values.get(device.target()));
+        values.put(device.target(), updated);
         return updated;
     }
 }

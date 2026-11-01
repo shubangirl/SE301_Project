@@ -3,35 +3,43 @@ package org.example.devices;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
-/** Consumer thread. Replaces the hand-rolled wait/notifyAll queue with a BlockingQueue and a stop marker. */
-public final class ControlCenter implements ControlDispatcher, Runnable {
-    private record Request(ControlTarget target, ControlType control) {}
+/** Consumer thread: takes queued requests and applies them to their targets. */
+public final class ControlCenter implements ShutdownableDispatcher {
+    private static final int DEFAULT_CAPACITY = 5;
 
-    private static final int CAPACITY = 5;
-    private static final Request STOP = new Request(null, null);
+    private sealed interface Message permits Command, Stop {}
+    private record Command(ControlTarget target, ControlDevice device) implements Message {}
+    private record Stop() implements Message {}
 
-    private final BlockingQueue<Request> queue = new ArrayBlockingQueue<>(CAPACITY);
+    private final BlockingQueue<Message> queue;
 
-    /** Blocks while the queue is full (same bounded-buffer behaviour as the legacy code). */
-    @Override
-    public void submit(ControlTarget target, ControlType control) throws InterruptedException {
-        queue.put(new Request(target, control));
+    public ControlCenter() {
+        this(DEFAULT_CAPACITY);
     }
 
-    /** Call once every producer has finished; requests already queued are still processed first. */
+    public ControlCenter(int capacity) {
+        this(new ArrayBlockingQueue<>(capacity));
+    }
+
+    private ControlCenter(BlockingQueue<Message> queue) {
+        this.queue = queue;
+    }
+
+    @Override
+    public void submit(ControlTarget target, ControlDevice device) throws InterruptedException {
+        queue.put(new Command(target, device));
+    }
+
+    @Override
     public void shutdown() throws InterruptedException {
-        queue.put(STOP);
+        queue.put(new Stop());
     }
 
     @Override
     public void run() {
         try {
-            while (true) {
-                Request request = queue.take();
-                if (request == STOP) {
-                    return;
-                }
-                request.target().apply(request.control());
+            while (queue.take() instanceof Command command) {
+                command.target().apply(command.device());
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

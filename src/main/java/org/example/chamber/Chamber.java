@@ -1,19 +1,29 @@
 package org.example.chamber;
 
 import org.example.crop.CropProfile;
+import org.example.devices.ControlDevice;
 import org.example.devices.ControlTarget;
-import org.example.devices.ControlType;
 
-/** One growing chamber: an id, a crop profile, its live state and its summary. */
+/** One growing chamber: ties together an id, a crop profile, its state and its summary. */
 public final class Chamber implements ControlTarget {
     private final String id;
     private final CropProfile crop;
-    private final ChamberState state = new ChamberState();
-    private final ChamberSummary summary = new ChamberSummary();
+    private final ChamberState state;
+    private final ChamberSummary summary;
+    private final ActionReporter reporter;
 
+    /** Default wiring, so existing callers keep working. */
     public Chamber(String id, CropProfile crop) {
+        this(id, crop, new ChamberState(), new ChamberSummary(), new ConsoleActionReporter());
+    }
+
+    public Chamber(String id, CropProfile crop, ChamberState state,
+                   ChamberSummary summary, ActionReporter reporter) {
         this.id = id;
         this.crop = crop;
+        this.state = state;
+        this.summary = summary;
+        this.reporter = reporter;
     }
 
     public String id() { return id; }
@@ -22,10 +32,9 @@ public final class Chamber implements ControlTarget {
     public ChamberSummary summary() { return summary; }
 
     @Override
-    public void apply(ControlType control) {
-        double value = state.apply(control);
-        summary.recordAction(control.label() + " Activated");
-        System.out.println("\t\u001B[32m[" + id + "][CONTROL] " + control.label() + " activated -> "
-                + control.target().displayName() + " now " + value + control.target().unit() + "\u001B[0m");
+    public void apply(ControlDevice device) {
+        double value = state.apply(device);
+        summary.recordAction(device.label() + " Activated");
+        reporter.deviceActivated(id, device, value);
     }
 }

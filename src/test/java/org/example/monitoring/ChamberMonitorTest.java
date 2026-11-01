@@ -1,26 +1,27 @@
 package org.example.monitoring;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.example.alerts.AlertRepository;
 import org.example.alerts.AlertService;
 import org.example.chamber.Chamber;
 import org.example.crop.CropRegistry;
+import org.example.devices.ControlDevice;
 import org.example.devices.ControlType;
 import org.example.model.SensorType;
-import org.junit.jupiter.api.Test;
-
-import java.util.ArrayList;
-import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
 
 class ChamberMonitorTest {
     @Test
     void hotTomatoRaisesAlertChargesEnergyAndRequestsFan() throws Exception {
         AlertService alerts = new AlertService(new AlertRepository());
         ResourceUsage usage = new ResourceUsage();
-        List<ControlType> requested = new ArrayList<>();
-        Chamber chamber = new Chamber("CH1", CropRegistry.withDefaults().get("Tomato"));
+        List<ControlDevice> requested = new ArrayList<>();
+        Chamber chamber = new Chamber("CH1",
+                CropRegistry.withDefaults().get("Tomato"));
         ChamberMonitor monitor = new ChamberMonitor(chamber, alerts, usage,
                 (target, control) -> requested.add(control));
 
@@ -35,8 +36,10 @@ class ChamberMonitorTest {
     @Test
     void readingInsideRangeDoesNothing() throws Exception {
         AlertService alerts = new AlertService(new AlertRepository());
-        Chamber chamber = new Chamber("CH1", CropRegistry.withDefaults().get("Tomato"));
-        new ChamberMonitor(chamber, alerts, new ResourceUsage(), (t, c) -> { }).process(SensorType.TEMPERATURE, 25);
+        Chamber chamber = new Chamber("CH1",
+                CropRegistry.withDefaults().get("Tomato"));
+        new ChamberMonitor(chamber, alerts, new ResourceUsage(), (t, c) -> {
+        }).process(SensorType.TEMPERATURE, 25);
         assertEquals(0, alerts.getActiveAlertCount());
     }
 
@@ -44,9 +47,11 @@ class ChamberMonitorTest {
     void lowNutrientUsesRuleDefinedConsumption() throws Exception {
         AlertService alerts = new AlertService(new AlertRepository());
         ResourceUsage usage = new ResourceUsage();
-        Chamber chamber = new Chamber("CH1", CropRegistry.withDefaults().get("Tomato"));
+        Chamber chamber = new Chamber("CH1",
+                CropRegistry.withDefaults().get("Tomato"));
 
-        new ChamberMonitor(chamber, alerts, usage, (t, c) -> { })
+        new ChamberMonitor(chamber, alerts, usage, (t, c) -> {
+        })
                 .process(SensorType.NUTRIENT, 20);
 
         assertEquals(15, usage.nutrient());

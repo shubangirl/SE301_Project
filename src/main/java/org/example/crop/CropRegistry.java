@@ -1,60 +1,64 @@
 package org.example.crop;
 
-import org.example.crop.Rule.Action;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.ServiceLoader;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static org.example.devices.ControlType.*;
-import static org.example.model.SensorType.*;
-
-/** Registry of known crops (Factory/Registry). Crops can be added or removed at runtime without touching other code. */
-public final class CropRegistry {
+/**
+ * Registry of known crops. Crops can be added or removed at runtime, and whole sets of crops can be
+ * loaded from any {@link CropSource}, without touching this class.
+ */
+public final class CropRegistry implements CropCatalog {
     private final Map<String, CropProfile> profiles = new ConcurrentHashMap<>();
 
     public void register(CropProfile profile) {
+        Objects.requireNonNull(profile, "profile");
         profiles.put(key(profile.name()), profile);
+    }
+
+    /** Registers every crop supplied by the source. Later registrations replace earlier ones of the same name. */
+    public CropRegistry registerAll(CropSource source) {
+        Objects.requireNonNull(source, "source").crops().forEach(this::register);
+        return this;
     }
 
     public boolean remove(String name) {
         return profiles.remove(key(name)) != null;
     }
 
-    public CropProfile get(String name) {
-        CropProfile profile = profiles.get(key(name));
-        if (profile == null) {
-            throw new IllegalArgumentException("Unknown crop: " + name);
-        }
-        return profile;
+    @Override
+    public Optional<CropProfile> find(String name) {
+        return Optional.ofNullable(profiles.get(key(name)));
     }
 
+    @Override
+    public CropProfile get(String name) {
+        return find(name).orElseThrow(() -> new IllegalArgumentException("Unknown crop: " + name));
+    }
+
+    @Override
     public Collection<CropProfile> all() {
-        return profiles.values();
+        return Collections.unmodifiableCollection(profiles.values());
     }
 
     private static String key(String name) {
-        return name.toLowerCase();
+        return Objects.requireNonNull(name, "name").strip().toLowerCase(Locale.ROOT);
     }
 
-    /** Legacy crops (thresholds copied from the original SVFRMS) plus Bell Pepper, the new crop. */
+    /** Registry preloaded with the built-in crops. */
     public static CropRegistry withDefaults() {
-        CropRegistry registry = new CropRegistry();
-        registry.register(CropProfile.of("Tomato",
-                new Rule(TEMPERATURE, 22, 28, Action.of(HEATING_UNIT, 0, 15), Action.of(COOLING_FAN, 0, 10)),
-                new Rule(HUMIDITY, 60, 80, Action.of(HUMIDIFIER, 20, 0), Action.of(DEHUMIDIFIER, 0, 0)),
-                Rule.lowOnly(SOIL, 45, Action.of(WATER_PUMP, 50, 0))));
-        registry.register(CropProfile.of("Strawberry",
-                new Rule(TEMPERATURE, 18, 24, Action.of(HEATING_UNIT, 0, 15), Action.of(COOLING_FAN, 0, 10)),
-                new Rule(HUMIDITY, 70, 85, Action.of(HUMIDIFIER, 25, 0), Action.of(DEHUMIDIFIER, 0, 0))));
-        registry.register(CropProfile.of("Lettuce", Rule.temperature(15, 21)));
-        registry.register(CropProfile.of("Spinach", Rule.temperature(10, 20)));
-        registry.register(CropProfile.of("Chili", Rule.temperature(24, 32)));
-        registry.register(CropProfile.of("Cucumber", Rule.temperature(18, 27)));
-        // New crop: needs only this entry; no existing class was modified to support it.
-        registry.register(CropProfile.of("Bell Pepper",
-                Rule.temperature(20, 28),
-                new Rule(HUMIDITY, 50, 70, Action.of(HUMIDIFIER, 15, 0), Action.of(VENTILATION_SYSTEM, 0, 0)),
-                Rule.lowOnly(SOIL, 50, Action.of(WATER_PUMP, 40, 0))));
+        return new CropRegistry().registerAll(new DefaultCrops());
+    }
+
+    /** Registry preloaded with the built-in crops plus every {@link CropSource} found on the classpath. */
+    public static CropRegistry withDiscoveredSources() {
+        CropRegistry registry = withDefaults();
+        ServiceLoader.load(CropSource.class).forEach(registry::registerAll);
         return registry;
     }
 }

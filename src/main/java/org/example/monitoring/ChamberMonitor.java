@@ -1,40 +1,44 @@
 package org.example.monitoring;
 
 import org.example.alerts.AlertPublisher;
-import org.example.alerts.AlertSeverity;
 import org.example.chamber.Chamber;
-import org.example.crop.Rule;
 import org.example.devices.ControlDispatcher;
 import org.example.model.SensorType;
 
-import java.util.Optional;
 import java.util.Random;
 
-/** Producer task for one chamber: reads sensors, checks the crop's rules, raises alerts, requests devices. */
+/** Producer task for one chamber: samples every sensor each cycle and hands readings to a {@link ReadingProcessor}. */
 public final class ChamberMonitor implements Runnable {
-    private static final int CYCLES = 20;
+    private static final int DEFAULT_CYCLES = 20;
+    private static final int BASELINE_WATER = 2;
+    private static final int BASELINE_ENERGY = 1;
 
-    private final Chamber chamber;
-    private final AlertPublisher alerts;
-    private final ResourceUsage usage;
-    private final ControlDispatcher controls;
+    private final ReadingProcessor processor;
+    private final ReadingSource readings;
+    private final UsageRecorder usage;
+    private final int cycles;
 
-    public ChamberMonitor(Chamber chamber, AlertPublisher alerts, ResourceUsage usage, ControlDispatcher controls) {
-        this.chamber = chamber;
-        this.alerts = alerts;
+    /** Same signature as before, so existing callers keep working (uses simulated readings). */
+    public ChamberMonitor(Chamber chamber, AlertPublisher alerts, UsageRecorder usage, ControlDispatcher controls) {
+        this(new ReadingProcessor(chamber, alerts, usage, controls),
+                new SimulatedReadingSource(new Random()), usage, DEFAULT_CYCLES);
+    }
+
+    public ChamberMonitor(ReadingProcessor processor, ReadingSource readings, UsageRecorder usage, int cycles) {
+        this.processor = processor;
+        this.readings = readings;
         this.usage = usage;
-        this.controls = controls;
+        this.cycles = cycles;
     }
 
     @Override
     public void run() {
-        Random random = new Random();
         try {
-            for (int i = 0; i < CYCLES; i++) {
+            for (int i = 0; i < cycles; i++) {
                 for (SensorType sensor : SensorType.values()) {
-                    process(sensor, sensor.simulate(random));
+                    process(sensor, readings.read(sensor));
                 }
-                usage.add(2, 1); // baseline consumption per cycle
+                usage.add(BASELINE_WATER, BASELINE_ENERGY);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -43,42 +47,6 @@ public final class ChamberMonitor implements Runnable {
 
     /** Package-visible so tests can feed a reading directly. */
     void process(SensorType sensor, double value) throws InterruptedException {
-        if (!Double.isFinite(value)) {
-            alerts.createSensorFailureAlert(
-                    chamber.id(),
-                    chamber.crop().name(),
-                    sensor.name(),
-                    "invalid reading"
-            );
-            chamber.summary().recordAlert("Sensor failure: " + sensor.name());
-            return;
-        }
-
-        chamber.state().set(sensor, value);
-
-        for (Rule rule : chamber.crop().rulesFor(sensor)) {
-            Optional<Rule.Breach> breach = rule.check(value);
-            if (breach.isEmpty()) {
-                continue;
-            }
-
-            Rule.Action action = breach.get().action();
-            String label = breach.get().high() ? sensor.highLabel() : sensor.lowLabel();
-            String message = chamber.id() + " " + chamber.crop().name() + " " + label;
-
-            alerts.createAlert(
-                    chamber.id(),
-                    chamber.crop().name(),
-                    message,
-                    AlertSeverity.WARNING
-            );
-            chamber.summary().recordAlert(message);
-            usage.add(action.water(), action.energy());
-            usage.addNutrient(action.nutrient());
-
-            if (action.control() != null) {
-                controls.submit(chamber, action.control());
-            }
-        }
+        processor.process(sensor, value);
     }
 }
