@@ -17,6 +17,13 @@ class ControlCenterTest {
     }
 
     @Test
+    void supportsRequiredAdditionalDevices() {
+        assertEquals(30, ControlType.HEATING_UNIT.next(25));
+        assertEquals(30, ControlType.VENTILATION_SYSTEM.next(35));
+        assertEquals(850, ControlType.SHADE_CONTROLLER.next(1000));
+    }
+
+    @Test
     void processesEveryQueuedRequestBeforeStopping() throws Exception {
         List<ControlType> applied = Collections.synchronizedList(new ArrayList<>());
         ControlTarget target = applied::add;

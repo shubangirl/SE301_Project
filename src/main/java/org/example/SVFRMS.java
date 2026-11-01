@@ -43,7 +43,10 @@ public class SVFRMS {
             pool.submit(new ChamberMonitor(chamber, alerts, usage, controls));
         }
         pool.shutdown();
-        pool.awaitTermination(5, TimeUnit.MINUTES);
+        if (!pool.awaitTermination(5, TimeUnit.MINUTES)) {
+            pool.shutdownNow();
+            throw new IllegalStateException("Chamber monitoring did not finish within five minutes");
+        }
 
         controls.shutdown();
         controlThread.join();

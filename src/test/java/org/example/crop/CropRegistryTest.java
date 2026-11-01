@@ -48,4 +48,26 @@ class CropRegistryTest {
     void bellPepperIsRegistered() {
         assertEquals("Bell Pepper", registry.get("bell pepper").name());
     }
+
+    @Test
+    void temperatureLowTriggersHeatingAndLightHighTriggersShade() {
+        Rule temperature = registry.get("Tomato")
+                .rulesFor(SensorType.TEMPERATURE).getFirst();
+        Rule light = registry.get("Tomato")
+                .rulesFor(SensorType.LIGHT).getFirst();
+
+        assertEquals(ControlType.HEATING_UNIT, temperature.check(20).orElseThrow().action().control());
+        assertEquals(ControlType.SHADE_CONTROLLER, light.check(1000).orElseThrow().action().control());
+    }
+
+    @Test
+    void bellPepperHighHumidityTriggersVentilation() {
+        Rule humidity = registry.get("Bell Pepper")
+                .rulesFor(SensorType.HUMIDITY).getFirst();
+
+        assertEquals(
+                ControlType.VENTILATION_SYSTEM,
+                humidity.check(75).orElseThrow().action().control()
+        );
+    }
 }

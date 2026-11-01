@@ -74,11 +74,9 @@ public final class ChamberMonitor implements Runnable {
             );
             chamber.summary().recordAlert(message);
             usage.add(action.water(), action.energy());
+            usage.addNutrient(action.nutrient());
 
             if (action.control() != null) {
-                if (action.control() == org.example.devices.ControlType.NUTRIENT_INJECTOR) {
-                    usage.addNutrient(15);
-                }
                 controls.submit(chamber, action.control());
             }
         }
