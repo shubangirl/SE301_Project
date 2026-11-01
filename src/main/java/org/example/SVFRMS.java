@@ -35,6 +35,7 @@ public class SVFRMS {
         CHAMBER_CROPS.put("CH3", "Lettuce");
         CHAMBER_CROPS.put("CH4", "Chili");
         CHAMBER_CROPS.put("CH5", "Bell Pepper");
+        // CHAMBER_CROPS.put("CH6", "Kale"); // Kale demo: uncomment
     }
 
     public static void main(String[] args) throws Exception {

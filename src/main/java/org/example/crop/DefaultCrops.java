@@ -31,7 +31,13 @@ public final class DefaultCrops implements CropSource {
                 CropProfile.of("Bell Pepper",
                         Rule.temperature(20, 28),
                         humidity(50, 70, Action.of(HUMIDIFIER, 15, 0), Action.of(VENTILATION_SYSTEM, 0, 0)),
-                        Rule.lowOnly(SOIL, 50, Action.of(WATER_PUMP, 40, 0))));
+                        Rule.lowOnly(SOIL, 50, Action.of(WATER_PUMP, 40, 0)))
+        // Kale demo: uncomment these four lines
+                // , CropProfile.of("Kale",
+                //         Rule.temperature(15, 22),
+                //         humidity(55, 75, Action.of(HUMIDIFIER, 15, 0), Action.of(VENTILATION_SYSTEM, 0, 0)),
+                //         Rule.lowOnly(SOIL, 45, Action.of(WATER_PUMP, 40, 0)))
+        );
     }
 
     private static Rule humidity(double low, double high, Action onLow, Action onHigh) {
